@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <title>fsindex</title>
+<style type="text/css">
+/* <![CDATA[ */
+* {
+ font-family: sans-serif;
+ font-size: 10px;
+}
+/* ]]> */
+</style>
+  </head>
+  <body>
+
+    <p>filename starts with: <input type="text" data-bind="value: basePrefix, valueUpdate: 'afterkeydown'"/></p>
+    <p>filename contains: <input type="text" data-bind="value: baseSubstr, valueUpdate: 'afterkeydown'"/></p>
+    <p>full path starts with: <input type="text" data-bind="value: pathPrefix, valueUpdate: 'afterkeydown'"/></p>
+    <p>owner username: <input type="text" data-bind="value: user, valueUpdate: 'afterkeydown'"/></p>
+    <hr/>
+    <div id="results">
+    </div>
+
+    <script src="static/knockout-2.0.0.js" type="text/javascript"></script>
+    <script src="static/jquery.min.js" type="text/javascript"></script>
+    <script type="text/javascript">
+    // <![CDATA[
+    $(function () { 
+        var query = {
+            basePrefix: ko.observable(""),
+            baseSubstr: ko.observable(""),
+	    user: ko.observable(""),
+	    pathPrefix: ko.observable("")
+        };
+        ko.applyBindings(query);
+	var currentRequest = null;
+	function update() {
+	    $("#results").css("opacity", .5);
+	    if(currentRequest) {
+		currentRequest.abort();
+	    }
+	    currentRequest = $.ajax({
+		url: "query", 
+		data: query, 
+		success: function (ret)  {
+		    $("#results").empty();
+		    if (!ret.docs) {
+			$("#results").append($("<div>").text("no matches"));
+		    }
+		    $.each(ret.docs, function (i, doc) {
+			$("#results").append($("<div>").text(doc.path));
+		    });
+		    $("#results").css("opacity", 1);
+		}
+	    });
+	}
+	$.each(query, function (k,v) {
+	    v.subscribe(update);
+	});
+    });
+    // ]]>
+    </script>
+
+  </body>
+</html>
