@@ -10,16 +10,19 @@
  font-family: sans-serif;
  font-size: 10px;
 }
+.error {
+white-space: pre-wrap;
+background: #fccece;
+}
 /* ]]> */
 </style>
   </head>
   <body>
 
-    <p>filename starts with: <input type="text" data-bind="value: basePrefix, valueUpdate: 'afterkeydown'"/></p>
-    <p>filename contains: <input type="text" data-bind="value: baseSubstr, valueUpdate: 'afterkeydown'"/></p>
-    <p>full path starts with: <input type="text" data-bind="value: pathPrefix, valueUpdate: 'afterkeydown'"/></p>
+    <p>full path contains: <input type="text" data-bind="value: pathSubstr, valueUpdate: 'afterkeydown'"/> (case insensitive)</p>
     <p>owner username: <input type="text" data-bind="value: user, valueUpdate: 'afterkeydown'"/></p>
     <hr/>
+    <div id="summary"/>
     <div id="results">
     </div>
 
@@ -29,31 +32,72 @@
     // <![CDATA[
     $(function () { 
         var query = {
-            basePrefix: ko.observable(""),
-            baseSubstr: ko.observable(""),
-	    user: ko.observable(""),
-	    pathPrefix: ko.observable("")
+	    pathSubstr: ko.observable(""),
+            user: ko.observable("")
         };
         ko.applyBindings(query);
 	var currentRequest = null;
 	function update() {
 	    $("#results").css("opacity", .5);
+            $("#summary").text("searching...");
 	    if(currentRequest) {
 		currentRequest.abort();
 	    }
+
+            var q = {
+                size: 100,
+                from: 0, 
+                query: {
+                }
+            };
+
+            var l = query.pathSubstr().length
+            if (l >= 3 && l <= 8) { // matching number in scan.py
+                q.query.term = {
+                    path: query.pathSubstr().toLowerCase() // unprocessed
+                };
+            } else {
+                q.query.text = {
+                    path: query.pathSubstr() // analyzed. Returns imprecise matches, which i'd like to eliminate
+                };
+            }
+
+            if (query.user()) {
+                q.filter = {
+                    and: [
+                        {
+                            term: {
+                                user: query.user()
+                            }
+                        }
+                    ]
+                };
+            }
+
 	    currentRequest = $.ajax({
 		url: "query", 
-		data: query, 
+		data: {q: JSON.stringify(q)
+                      },
 		success: function (ret)  {
-		    $("#results").empty();
-		    if (!ret.docs) {
-			$("#results").append($("<div>").text("no matches"));
-		    }
-		    $.each(ret.docs, function (i, doc) {
-			$("#results").append($("<div>").text(doc.path));
+		    $("#results").attr("class","").empty();
+		    if (!ret.hits.hits) {
+			$("#summary").text("no matches");
+		    } else {
+                        $("#summary").text(ret.hits.total+" hits in "+ret.took+" ms");
+                    }
+                    
+		    $.each(ret.hits.hits, function (i, doc) {
+                        var s = doc._source;
+			$("#results").append($("<div>").text(s.path + " ("+s.user+")"));
 		    });
 		    $("#results").css("opacity", 1);
-		}
+		},
+                error: function (xhr, text, err) {
+                    if (err == "abort") {
+                        return;
+                    }
+                    $("#results").attr("class", "error").text(xhr.responseText);
+                }
 	    });
 	}
 	$.each(query, function (k,v) {

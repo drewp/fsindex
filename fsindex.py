@@ -3,42 +3,46 @@ webserver of mongodb fsindex.files data
 """
 from __future__ import division
 
-import cyclone.web, pymongo, json, re, sys
+import cyclone.web, json, re, sys, restkit
 from twisted.internet import reactor
+import httplib, cgi
+
+class PrettyErrorHandler(object):
+    """
+    mix-in to improve cyclone.web.RequestHandler
+    """
+    def get_error_html(self, status_code, **kwargs):
+        try:
+            tb = kwargs['exception'].getTraceback()
+        except AttributeError:
+            tb = ""
+        return "<html><title>%(code)d: %(message)s</title>" \
+               "<body>%(code)d: %(message)s<pre>%(tb)s</pre></body></html>" % {
+            "code": status_code,
+            "message": httplib.responses[status_code],
+            "tb" : cgi.escape(tb),
+        }
 
 class Index(cyclone.web.RequestHandler):
     def get(self):
         self.set_header("Content-Type", "application/xhtml+xml")
         self.write(open("index.html").read())
 
-class Query(cyclone.web.RequestHandler):
+class Query(PrettyErrorHandler, cyclone.web.RequestHandler):
     def get(self):
         # the client may abort this, and it would be great to forward
-        # that abort into a mongodb
-        # killOp. http://stackoverflow.com/questions/7348736/how-to-check-if-connection-was-aborted-in-node-js-server
+        # that abort into
+        # ES. http://stackoverflow.com/questions/7348736/how-to-check-if-connection-was-aborted-in-node-js-server
         # talks about handling it for nodejs. The server may have to
         # send occasional no-op bytes over the link to know if it's
         # been closed. Or can my client be nice and send something
         # from its end just before closing?
         
+        jsonRet = db.post("_search", payload=self.get_argument("q"),
+                          headers={'content-type':'application/json'}).body_string()
         self.set_header("Content-Type", "application/json")
-        spec = {}
+        self.write(jsonRet)
 
-        args = self.request.arguments
-        if args.get('basePrefix', []):
-            spec['base'] = re.compile("^"+re.escape(args['basePrefix'][0]))
-        if args.get('baseSubstr', []):
-            # join this with the prefix one
-            spec['base'] = re.compile(re.escape(args['baseSubstr'][0]))
-
-        if args.get('user', []):
-            spec['user'] = args['user'][0]
-
-        if args.get('pathPrefix', []):
-            spec['path'] = re.compile("^"+re.escape(args['pathPrefix'][0]))
-
-        docs = list(self.settings.db['files'].find(spec).limit(101))
-        self.write(json.dumps({'docs':docs}))
 
 class Static(cyclone.web.RequestHandler):
     def get(self, f):
@@ -49,7 +53,7 @@ if __name__ == '__main__':
     from twisted.python import log as twlog
     twlog.startLogging(sys.stdout)
 
-    db = pymongo.Connection("bang", 27017)['fsindex']
+    db = restkit.Resource("http://plus:9200/fsindex/files/")
     reactor.listenTCP(9089, cyclone.web.Application([
         (r"^/", Index),
         (r"^/query", Query),
