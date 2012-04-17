@@ -38,8 +38,14 @@ class Query(PrettyErrorHandler, cyclone.web.RequestHandler):
         # been closed. Or can my client be nice and send something
         # from its end just before closing?
         
-        jsonRet = db.post("_search", payload=self.get_argument("q"),
+        jsonRet = db.post("files/_search", payload=self.get_argument("q"),
                           headers={'content-type':'application/json'}).body_string()
+        self.set_header("Content-Type", "application/json")
+        self.write(jsonRet)
+
+class Status(PrettyErrorHandler, cyclone.web.RequestHandler):
+    def get(self):
+        jsonRet = db.get("_status").body_string()
         self.set_header("Content-Type", "application/json")
         self.write(jsonRet)
 
@@ -51,12 +57,13 @@ class Static(cyclone.web.RequestHandler):
 if __name__ == '__main__':
 
     from twisted.python import log as twlog
-    twlog.startLogging(sys.stdout)
+    #twlog.startLogging(sys.stdout)
 
-    db = restkit.Resource("http://plus:9200/fsindex/files/")
+    db = restkit.Resource("http://localhost:9200/fsindex/")
     reactor.listenTCP(9089, cyclone.web.Application([
         (r"^/", Index),
         (r"^/query", Query),
+        (r"^/status", Status),
         (r"^/static/(knockout-2\.0\.0\.js|jquery\.min\.js)$", Static),
         ], db=db))
     reactor.run()

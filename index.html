@@ -18,6 +18,9 @@ background: #fccece;
 </style>
   </head>
   <body>
+    <h1>File search</h1>
+
+    <p id="status"/>
 
     <p>full path contains: <input type="text" data-bind="value: pathSubstr, valueUpdate: 'afterkeydown'"/> (case insensitive)</p>
     <p>owner username: <input type="text" data-bind="value: user, valueUpdate: 'afterkeydown'"/></p>
@@ -30,20 +33,31 @@ background: #fccece;
     <script src="static/jquery.min.js" type="text/javascript"></script>
     <script type="text/javascript">
     // <![CDATA[
-    $(function () { 
+    $(function () {
+
+	$.getJSON("status", function (ret) {
+	    var fi = ret.indices.fsindex;
+	    var mill = fi.docs.num_docs / 1000000;
+	    $("#status").text("Searching "+ (Math.round(mill * 10)/10) + "M filenames, "+
+			      fi.index.primary_size+" index");
+	});
+ 
         var query = {
 	    pathSubstr: ko.observable(""),
             user: ko.observable("")
         };
         ko.applyBindings(query);
 	var currentRequest = null;
+	var pending = false;
 	function update() {
 	    $("#results").css("opacity", .5);
             $("#summary").text("searching...");
 	    if(currentRequest) {
                 // i don't think elastic is getting this. we should
                 // just run requests in series
-		currentRequest.abort();
+		//currentRequest.abort();
+		pending = true;
+		return;
 	    }
 
             var q = {
@@ -97,6 +111,12 @@ background: #fccece;
 			$("#results").append($("<div>").text(t));
 		    });
 		    $("#results").css("opacity", 1);
+		    currentRequest = null;
+		    if (pending) {
+			pending = false;
+			update();
+		    }
+
 		},
                 error: function (xhr, text, err) {
                     if (err == "abort") {

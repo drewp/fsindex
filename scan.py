@@ -95,7 +95,7 @@ def resetIndex(db):
 
 db =  pyes.ES('localhost:9200')
 resetIndex(db)
-for num, line in enumerate(open("files.json")):
+for num, line in enumerate(open("/tmp/files.json")):
     try:
         d = json.loads(line)
         del d['_id']
@@ -112,7 +112,11 @@ db.update_settings('fsindex', {
         'refresh_interval':'30s',
         }
     })
-
+"""
+this should do a real scan of all the volumes when there's an index schema change,
+and the rest of the time it should do a nightly refresh of the volatile areas. it would
+be cool if we could get notifications of all file changes, but that's hard on solaris nfs.
+"""
 top = "/my"
 host = 'nfs'
 #ingest(host, top, db)
