@@ -41,6 +41,8 @@ background: #fccece;
 	    $("#results").css("opacity", .5);
             $("#summary").text("searching...");
 	    if(currentRequest) {
+                // i don't think elastic is getting this. we should
+                // just run requests in series
 		currentRequest.abort();
 	    }
 
@@ -52,7 +54,7 @@ background: #fccece;
             };
 
             var l = query.pathSubstr().length
-            if (l >= 3 && l <= 8) { // matching number in scan.py
+            if (l >= 3 && l < 8) { // matching number in scan.py
                 q.query.term = {
                     path: query.pathSubstr().toLowerCase() // unprocessed
                 };
@@ -88,7 +90,11 @@ background: #fccece;
                     
 		    $.each(ret.hits.hits, function (i, doc) {
                         var s = doc._source;
-			$("#results").append($("<div>").text(s.path + " ("+s.user+")"));
+                        var t = s.path;
+                        if (s.user != "drewp") {
+                            t += " (owned by "+s.user+")";
+                        }
+			$("#results").append($("<div>").text(t));
 		    });
 		    $("#results").css("opacity", 1);
 		},
